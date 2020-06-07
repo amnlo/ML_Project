@@ -1,0 +1,50 @@
+---
+title: "Link CID identifier of PubChem to CAS number"
+output: html_notebook
+---
+
+The [PubChem database](https://pubchem.ncbi.nlm.nih.gov/) that we rely on in the project does not include the CAS number as an attribute of its compounds. These have to be linked throught the web interface since it is not possible through the api. This is what this script does.
+
+The solution is based on [this](https://stackoverflow.com/questions/21551937/cas-registry-to-pubchem-cid-identifier-conversion-in-r) and [this](https://stackoverflow.com/questions/23430547/htmlparse-fails-to-load-external-entity) StackOverflow question. Define a function that converts CAS to PubChem CID:
+
+```{r}
+library(XML)
+library(httr)
+library(dplyr)
+
+convertU = function(query){
+    xmlresponse = xmlParse(rawToChar(GET(paste0("http://www.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pccompound&retmax=100&term=",query))$content))
+    sapply(xpathSApply(xmlresponse, "//Id"), function(n){xmlValue(n)})
+ }
+```
+
+This is how the funciton is applied. We make some manual tests to see if it returns the right chemical in a small sample of cases:
+
+```{r}
+convertU("100-00-5")
+convertU("100-01-6")
+convertU("100-02-7")
+```
+It seems to return the correct CID identifiers for the CAS tested above. Now we apply it to the whole data set of the ecotoxicological tests.
+
+```{r}
+wrap_convert <- function(x){
+  Sys.sleep(0.5)
+  tmp <- try(convertU(x))
+  if(class(tmp)=="try-error"){
+    warning(paste0("failed to get CID for CAS: ",x,"\n"))
+    return(NA)
+  }else{
+    return(tmp)
+  }
+}
+```
+
+Apply the function defined above to the whole data set. The `Sys.sleep` is necessary to stay below the limit that the PubChem server has for number of queries per second.
+
+```{r}
+final_db <- read.csv("data/processed/final_db_processed.csv") # read preprocessed data
+cid <- lapply(as.character(final_db$test_cas), FUN=wrap_convert)
+names(cid) <- as.character(final_db$test_cas)
+save(cid, file="dummy_cid.RData")
+```

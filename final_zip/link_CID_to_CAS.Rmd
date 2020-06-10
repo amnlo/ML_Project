@@ -12,6 +12,8 @@ library(XML)
 library(httr)
 library(dplyr)
 
+final_db <- read.csv("data/processed/final_db_processed.csv") # read preprocessed data
+
 convertU = function(query){
     xmlresponse = xmlParse(rawToChar(GET(paste0("http://www.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pccompound&retmax=100&term=",query))$content))
     sapply(xpathSApply(xmlresponse, "//Id"), function(n){xmlValue(n)})
@@ -43,8 +45,24 @@ wrap_convert <- function(x){
 Apply the function defined above to the whole data set. The `Sys.sleep` is necessary to stay below the limit that the PubChem server has for number of queries per second.
 
 ```{r}
-final_db <- read.csv("data/processed/final_db_processed.csv") # read preprocessed data
 cid <- lapply(as.character(final_db$test_cas), FUN=wrap_convert)
 names(cid) <- as.character(final_db$test_cas)
-save(cid, file="dummy_cid.RData")
+save(cid, file="dummy_cid.RData") # save the intermediate list linking CAS to CID
 ```
+
+Now that we have the linking between the two identifiers, we save it in `.csv` format as a file that is separate from our processed data.
+
+```{r}
+## Helper function to make a data frame out of the two supplied arguments
+orga <- function(x,y){
+  if(length(y)==0) y <- NA
+  data.frame(cas=x, cid=y, stringsAsFactors=FALSE)
+}
+## Prepare list of data frames
+tmp <- mapply("orga", names(cid), cid, SIMPLIFY=FALSE)
+## Convert list to data frame
+identifiers <- dplyr::bind_rows(tmp) %>% filter(!duplicated(.))
+## Save to file
+write.csv(identifiers, file="data/processed/cas_to_pubchemcid.csv")
+```
+Some of the CAS have multiple CIDs and some of the CIDs have multiple CAS. This is not dealt with here, it needs to be considered at a later stage.

@@ -1,13 +1,15 @@
 ---
 title: "Link CID identifier of PubChem to CAS number"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 The [PubChem database](https://pubchem.ncbi.nlm.nih.gov/) that we rely on in the project does not include the CAS number as an attribute of its compounds. These have to be linked throught the web interface since it is not possible through the api. This is what this script does.
 
 The solution is based on [this](https://stackoverflow.com/questions/21551937/cas-registry-to-pubchem-cid-identifier-conversion-in-r) and [this](https://stackoverflow.com/questions/23430547/htmlparse-fails-to-load-external-entity) StackOverflow question. Define a function that converts CAS to PubChem CID:
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 library(XML)
 library(httr)
 library(dplyr)
@@ -44,7 +46,7 @@ wrap_convert <- function(x){
 
 Apply the function defined above to the whole data set. The `Sys.sleep` is necessary to stay below the limit that the PubChem server has for number of queries per second.
 
-```{r}
+```{r eval=FALSE}
 cid <- lapply(as.character(final_db$test_cas), FUN=wrap_convert)
 names(cid) <- as.character(final_db$test_cas)
 save(cid, file="dummy_cid.RData") # save the intermediate list linking CAS to CID
@@ -52,7 +54,7 @@ save(cid, file="dummy_cid.RData") # save the intermediate list linking CAS to CI
 
 Now that we have the linking between the two identifiers, we save it in `.csv` format as a file that is separate from our processed data.
 
-```{r}
+```{r eval=FALSE}
 ## Helper function to make a data frame out of the two supplied arguments
 orga <- function(x,y){
   if(length(y)==0) y <- NA

@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import itertools
 
+from src.general_helper import splt_str
+
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
@@ -14,10 +16,11 @@ from scipy.spatial.distance import hamming
 from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
 
-def encode_categories(final_db):
+def encode_categories(final_db, encode_these = []):
     '''Take needed features from the dataset and encode string into categorical numbers
     Inputs:
-        - final_db (Pandas dataframe): cleaned dataframe 
+        - final_db (Pandas dataframe): cleaned dataframe
+        - encode_these (list): selection of features that should be encoded. If empty (default) encode all string features
     Outputs:
         - X (Pandas dataframe): feature matrix dimension NxD, where N is the datapoints number and D the number of features
         - y (numpy array): labels array (binary or multiclass), dimension Nx1 
@@ -25,18 +28,17 @@ def encode_categories(final_db):
     '''
         
     # Loading data
-    X = final_db.copy()
-    X = X[[
-    'exposure_type', 'obs_duration_mean', 'conc1_type', 'species', 'class','tax_order', 'family', 'genus',
-    'atom_number', 'alone_atom_number', 'tripleBond','doubleBond', 'bonds_number', 'ring_number', 'Mol', 
-    'MorganDensity', 'LogP']]
     y = final_db.score.copy().values
+    X = final_db.copy()
+    X = X.drop(columns=['score'])
     
-    # Encoding phase
     enc = OrdinalEncoder(dtype=int)
-    enc.fit(X[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']])
-    X[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']] = \
-        enc.transform(X[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']])
+    if len(encode_these)==0:
+        encode_these = [type(X.iloc[0,er]) is str for er in range(X.shape[1])] # get types of features
+
+    enc.fit(X.loc[:,encode_these])
+    X.loc[:,encode_these] = \
+        enc.transform(X.loc[:,encode_these])
         
     return X, y, enc
         
@@ -49,40 +51,49 @@ def get_features():
         - non_categorical (list): list of numerical, non categorical features'''
     
     # Define variables
-    categorical = [
-    'ring_number', "exposure_type", "conc1_type", "species", 'tripleBond', 'obs_duration_mean',
-    'doubleBond', 'alone_atom_number', 'class', 'tax_order', 'family', 'genus']
+    categorical = ["exposure_type", "conc1_type", "species", 'obs_duration_mean', 'class', 'tax_order', 'family', 'genus']
     
-    non_categorical =['atom_number', 'bonds_number', 'Mol', 'MorganDensity', 'LogP']
+    non_categorical =[]
     
     return categorical, non_categorical
 
 
-def compute_distance_matrix(X, len_X_train, cat_features = [], num_features = [], alpha = 1):
+def compute_distance_matrix(X, len_X_train, cat_features = [], num_features = [], group_features={}, alpha ={}):
     '''Compute distance matrix for the KNN algorithm (see report for detail)
     Inputs:
         - X (Pandas dataframe or numpy array-like): complete feature matrix X (shape NxD)
         - len_X_train (int): length of the X_train matrix previously computed (to correctly divide the train from the test)
-        - cat_features (list): list of categorical features
-        - num_features (list): list of numerical, non categorical features
-        - alpha (int): weight for the categorical features loss (see report for detail)
+        - cat_features (list): list of categorical features (this is not used at the moment)
+        - num_features (list): list of numerical, non categorical features (this is not used at the moment)
+        - group_features (dict): grouping of features (columns) to calculate hamming's distance)
+        - alpha (dict): weight for each group of features)
     Output: 
         - dist_matr_train (Pandas dataframe): distance matrix to use for trainining
         - dist_matr_test (Pandas dataframe): distance matrix to use for testing
     '''
 
-    # Select numerical and categorical features
-    X_cat = X[cat_features]
-    X_num = X[num_features]
+    # Consistency check
+    if len(alpha)!=len(group_features):
+        raise Exception('length of dict group_features not equal to length of dict alpha')
+    if len(num_features)>0:
+        raise Exception('cannot deal with numerical features at the moment...')
+
     
-    # Compute matrix for both categorical and numerical or just one (generalization for feature selection)
-    if (len(cat_features)!=0 and len(num_features)):
-        dist_matr = alpha * squareform(pdist(X_cat, metric = "hamming"))
-        dist_matr += squareform(pdist(X_num, metric = "euclidean"))
-    elif(len(cat_features)!=0):
-        dist_matr = alpha * squareform(pdist(X_cat, metric = "hamming"))
-    else:
-        dist_matr = squareform(pdist(X_num, metric = "euclidean"))
+    # Compute one distance matrix for each group of features
+    
+    for grp in group_features.keys():
+        X_curr = X[group_features[grp]]
+        if X_curr.shape[1]==1 and type(X_curr.iloc[0,0]) is str:# if there is only one string feature in a group
+            X_curr.columns = ['col1']
+            # split string and then compute hamming distance on characters
+            X_curr = pd.DataFrame(X_curr.col1.apply(splt_str))
+            X_curr = pd.DataFrame(X_curr.col1.tolist(), index=X_curr.index)
+            dist_matr = squareform(pdist(X_curr, metric = "hamming"))
+        else:
+            # compute hamming distance on combination of features
+            dist_matr = squareform(pdist(X_curr, metric = "hamming"))
+        # multiply weighted (alpha) distance matrices of different group_features
+        dist_final =+ alpha[grp] * dist_matr
 
     # Extract train and test matrices
     dist_matr_train = dist_matr[:len_X_train,:len_X_train]
@@ -129,7 +140,7 @@ def feature_selection_knn(X_train, X_test, y_train, y_test, categorical, non_cat
 
         # Compute distance matrix and KNN
         len_X_train = len(X_train)
-        X_train_new, X_test_new = compute_distance_matrix(X_train.append(X_test), len_X_train, cat,non_cat, alpha = 1)
+        X_train_new, X_test_new = compute_distance_matrix(X_train.append(X_test), len_X_train, cat,non_cat, group_features, alpha = 1)
         
         neigh = KNeighborsClassifier(metric = 'precomputed')
         neigh.fit(X_train_new, y_train.ravel())
@@ -221,7 +232,7 @@ def cv_knn(X, y, cat_features = [], num_features = [], alphas = [], ks = [], lea
     return best_alpha, best_k, best_leaf
 
         
-def run_knn(X_train, y_train, X_test, categorical, non_categorical, alpha, k, leaf_size):
+def run_knn(X_train, y_train, X_test, categorical, non_categorical, group_features, alpha, k, leaf_size):
     '''Run KNN algorithm and return predictions.
     Inputs:
         - X_train, X_test (Pandas dataframe): feature matrix splitted in train and test
@@ -238,20 +249,23 @@ def run_knn(X_train, y_train, X_test, categorical, non_categorical, alpha, k, le
     
     # Compute Distance Matrix
     len_X_train = len(X_train)
-    X_train_distance, X_test_distance = compute_distance_matrix(X_train.append(X_test), len_X_train, categorical, non_categorical, alpha)
+    print("Computing distance matrix ...")
+    X_train_distance, X_test_distance = compute_distance_matrix(X_train.append(X_test), len_X_train, categorical, non_categorical, group_features, alpha)
     
     # Run KNN
+    print("Calssifying training data ...")
     neigh = KNeighborsClassifier(metric = 'precomputed', n_neighbors=k, leaf_size=leaf_size)
     neigh.fit(X_train_distance, y_train.ravel())
     
     # Make predictions
+    print("Making predictions ...")
     y_pred_train = neigh.predict(X_train_distance)
     y_pred_test = neigh.predict(X_test_distance)
     
     return y_pred_train, y_pred_test
 
 
-def decode_categories(X_final_train, X_final_test, enc):
+def decode_categories(X_final_train, X_final_test, enc, encode_these):
     '''Decode categorical features from numbers to strings
     Inputs:
         - X_final_train (Pandas dataframe): final train dataset with prediction (categories as numbers)
@@ -261,11 +275,11 @@ def decode_categories(X_final_train, X_final_test, enc):
         - X_final_test (Pandas dataframe): final train dataset with prediction (categories as strings)
     '''
          
-    X_final_train[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']] = \
-        enc.inverse_transform(X_final_train[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']])
+    X_final_train.loc[:,encode_these] = \
+        enc.inverse_transform(X_final_train.loc[:,encode_these])
         
-    X_final_test[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']] = \
-        enc.inverse_transform(X_final_test[['exposure_type', 'conc1_type', 'species', 'class', 'tax_order', 'family', 'genus']])
+    X_final_test.loc[:,encode_these] = \
+        enc.inverse_transform(X_final_test.loc[:,encode_these])
         
     return X_final_train, X_final_test
     

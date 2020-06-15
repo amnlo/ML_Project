@@ -8,10 +8,10 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
-from .helper_knn import *
+from src.knn.helper_knn import *
 from src.general_helper import split_dataset, build_final_datasets
 
-def knn_algorithm(final_db, feat_sel, cross, singleclass, seed=13):
+def knn_algorithm(final_db, feat_sel, cross, singleclass, encode_these=[], group_features=[], seed=13):
     '''Main function to use the KNN algorithm.
     Inputs:
         - final_db (Pandas dataframe): complete db after preprocessing
@@ -28,7 +28,7 @@ def knn_algorithm(final_db, feat_sel, cross, singleclass, seed=13):
     
     # Encoding categorical features and split
     print("Encoding categorical features for the KNN algorithm...\n")
-    X, y, encoder = encode_categories(final_db)
+    X, y, encoder = encode_categories(final_db, encode_these)
     print("Splitting dataset in train and test...\n")
     X_train, X_test, y_train, y_test = split_dataset(X, y, seed)
     categorical, non_categorical = get_features()
@@ -62,7 +62,7 @@ def knn_algorithm(final_db, feat_sel, cross, singleclass, seed=13):
     
     # Run KNN algorithm
     print("Run KNN algorithm with best parameters...")
-    y_pred_train, y_pred_test = run_knn(X_train, y_train, X_test, best_cat, best_non_cat, best_alpha, best_k, best_leaf)
+    y_pred_train, y_pred_test = run_knn(X_train, y_train, X_test, group_features, best_alpha, best_k, best_leaf)
     print("Prediction achieved!\n")
     
     # Computing accuracy
@@ -75,7 +75,7 @@ def knn_algorithm(final_db, feat_sel, cross, singleclass, seed=13):
     # Build final dataset
     print("Building final dataset for future uses...\n")
     X_final_train, X_final_test = build_final_datasets(X_train, X_test, y_pred_train, y_pred_test, y_train, y_test)
-    X_final_train, X_final_test = decode_categories(X_final_train, X_final_test, encoder)
+    X_final_train, X_final_test = decode_categories(X_final_train, X_final_test, encoder, encode_these)
     
     
     return X_final_train, X_final_test

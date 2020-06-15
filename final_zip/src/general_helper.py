@@ -16,6 +16,8 @@ def binary_score(final_db):
     # Computing score
     final_db_scored = final_db.copy()
     final_db_scored["score"] = np.where(final_db_scored.conc1_mean > 1, 1, 0)
+    # Drop conc1_mean (it is replaced by score)
+    final_db_scored = final_db_scored.drop(columns=['conc1_mean'])
     
     # Info
     num0 = len(final_db_scored[final_db_scored.score==0])
@@ -53,6 +55,8 @@ def multi_score(final_db):
     # Computing score
     final_db_scored = final_db.copy()
     final_db_scored["score"] = final_db_scored.conc1_mean.apply(lambda x: scores_cat(x))
+    # Drop conc1_mean (it is replaced by score)
+    final_db_scored.drop(columns=['conc1_mean'])
     
     # Info
     for i in range(1, 6):
@@ -110,5 +114,16 @@ def build_final_datasets(X_train, X_test, y_pred_train, y_pred_test, y_train=[],
     X_final_test["predicted_score"] = y_pred_test
     
     return X_final_train, X_final_test
-    
+
+def splt_str(x, len_na=1):
+    '''Split a string into a list of characters
+    Inputs:
+        - x (string): String to be split
+        - len_na (int): if x is NA, a list of NAs of length len_na is returned
+    Outputs:
+        - A list of characters'''
+    if pd.isna(x):
+        return ['NA'] * len_na
+    else:
+        return [cr for cr in x]
     

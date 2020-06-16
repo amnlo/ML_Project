@@ -11,6 +11,105 @@ from math import sqrt
 from src.knn.helper_knn import *
 from src.general_helper import split_dataset, build_final_datasets
 
+class Knn:
+    
+    def __init__(self, name='dummy'):
+        self.name = name
+        
+    def setup(self, data, encode_these=[], group_features={}, alpha={}, seed=13):
+        self.encode_these = encode_these
+        self.group_features = group_features
+        self.alpha = alpha
+        self.seed = seed
+        # Encoding categorical features and split
+        print("Encoding categorical features for the KNN algorithm...\n")
+        data, self.y, self.encoder = self.encode_categories(data)
+        print("Splitting dataset in train and test...\n")
+        self.X_train, self.X_test, self.y_train, self.y_test = split_dataset(data, self.y, self.seed)
+        
+    def encode_categories(self, data):
+        y = data.score.copy().values
+        X = data.copy()
+        X = X.drop(columns=['score'])
+    
+        enc = OrdinalEncoder(dtype=int)
+        if len(self.encode_these)==0:
+            tmp = [type(X.iloc[0,er]) is str for er in range(X.shape[1])] # get types of features
+        else:
+            tmp = self.encode_these
+
+        enc.fit(X.loc[:,tmp])
+        X.loc[:,tmp] = \
+        enc.transform(X.loc[:,tmp])
+        
+        return X, y, enc
+    
+    def compute_distances(self):
+        if len(self.alpha)!=len(self.group_features):
+            raise Exception('length of dict group_features not equal to length of alpha')    
+        
+        # Compute one distance matrix for each group of features
+        X = self.X_train.append(self.X_test)
+        self.distances = {}
+        for grp in self.group_features.keys():
+            X_curr = X[self.group_features[grp]]
+            if X_curr.shape[1]==1 and type(X_curr.iloc[0,0]) is str:# if there is only one string feature in a group
+                X_curr.columns = ['col1']
+                # split string and then compute hamming distance on characters
+                X_curr = pd.DataFrame(X_curr.col1.apply(splt_str))
+                X_curr = pd.DataFrame(X_curr.col1.tolist(), index=X_curr.index)
+                X_curr = X_curr=='1' # convert to boolean for better performance
+                dist_vec = np.float32(pdist(X_curr, metric = "hamming"))
+            else:
+                # compute hamming distance on combination of features
+                dist_vec = np.float32(pdist(X_curr, metric = "hamming"))
+            # save computed distance matrix in class object (because it takes so long)
+            self.distances[grp] = dist_vec
+    
+    def weight_distances(self, alpha=0):
+        if(hasattr(self, 'distances')):
+            if alpha==0:
+                alpha = self.alpha
+            # multiply weighted (alpha) distances of different group_features
+            dist_final = np.zeros(next(iter(self.distances.values())).shape, dtype=np.float32)
+            for grp in self.group_features.keys():
+                dist_final = dist_final + np.float32(alpha[grp] * self.distances[grp])
+        else:
+            raise Exception('cannot weight distances since they don\'t exist')
+        return dist_final
+            
+    def split_distance_matrix(self, dist_mat):
+        # Extract train and test matrices
+        self.dist_train = dist_mat[:len(self.X_train),:len(self.X_train)]
+        self.dist_test = dist_mat[len(self.X_train):,:len(self.X_train)]
+        
+    def run(self, n_neighbors=1, leaf_size=60):
+        # Run KNN
+        neigh = KNeighborsClassifier(metric = 'precomputed', n_neighbors=n_neighbors, leaf_size=leaf_size)
+        neigh.fit(self.dist_train, self.y_train.ravel())
+    
+        # Make predictions
+        y_pred_train = neigh.predict(self.dist_train)
+        y_pred_test = neigh.predict(self.dist_test)
+        acc = accuracy_score(self.y_test, y_pred_test)
+        
+        return acc
+    
+    def fun_minim(self, x, file='dummy.txt'):
+        n_neighbors = np.int(np.round(np.clip(x[0], 1, None)))
+        x = np.clip(x, 0, None)
+        alpha = {0:x[1], 1:x[2], 2:x[3]}
+        tmp = self.weight_distances(alpha=alpha)
+        self.split_distance_matrix(dist_mat=squareform(tmp))
+        tmp = None
+        acc = self.run(n_neighbors=n_neighbors)
+        df = pd.DataFrame([[n_neighbors, x[1], x[2], x[3], acc]])
+        df.to_csv(file, mode='a', header=False)
+        
+        return 1-acc
+        
+    
+
 def knn_algorithm(final_db, feat_sel, cross, singleclass, encode_these=[], group_features=[], seed=13):
     '''Main function to use the KNN algorithm.
     Inputs:

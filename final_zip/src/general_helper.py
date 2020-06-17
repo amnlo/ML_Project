@@ -126,4 +126,12 @@ def splt_str(x, len_na=1):
         return ['NA'] * len_na
     else:
         return [cr for cr in x]
+
+def compute_tanimoto(a, b):
+    a_and_b = (a & b).sum()
+    not_a = ~a
+    not_b = ~b
+    tani = a_and_b / ((a & not_b).sum() + (b & not_a).sum() + a_and_b)
+
+    return tani
     

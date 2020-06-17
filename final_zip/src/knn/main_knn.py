@@ -7,16 +7,17 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+from itertools import combinations
 
 from src.knn.helper_knn import *
-from src.general_helper import split_dataset, build_final_datasets
+from src.general_helper import split_dataset, build_final_datasets, compute_tanimoto
 
 class Knn:
     
     def __init__(self, name='dummy'):
         self.name = name
         
-    def setup(self, data, encode_these=[], group_features={}, alpha={}, seed=13):
+    def setup(self, data, cas=[], smiles=[], encode_these=[], group_features={}, alpha={}, seed=13):
         self.encode_these = encode_these
         self.group_features = group_features
         self.alpha = alpha
@@ -44,42 +45,80 @@ class Knn:
         
         return X, y, enc
     
-    def compute_distances(self):
-        if len(self.alpha)!=len(self.group_features):
-            raise Exception('length of dict group_features not equal to length of alpha')    
-        
+    def condense_featuregroups(self):
+        # When features are grouped, there are duplicates for each group. This function calculates the mapping of the full data set to the condensed data
+        X = self.X_train.append(self.X_test)
+        self.map = {}
+        for grp in self.group_features.keys():
+            X_f = X[self.group_features[grp]]
+            # Select uniqe rows
+            X_curr = X_f[~X_f.duplicated()]
+            # Make a list of integers that maps from the row indices in X to the position of the condensed data
+            map_condense = [-1] * len(X)
+            for j in range(len(X_curr)):
+                print(j, 'of', len(X_curr))
+                wi = X_f.apply(lambda x,y: not (np.array(x) != np.array(y)).any(), axis=1, args=(X_curr.iloc[j,:],))
+                #wi = [all(X_f.iloc[x,:] == X_curr.iloc[j,:]) for x in range(len(X_f))]
+                map_condense = np.where(wi, j, map_condense)
+            if any(map_condense==-1):
+                raise Exception('some rows of X could not be assigned to the condensed dataset')
+            self.map[grp] = map_condense
+
+    
+    def compute_distance(self, metrics={}):
         # Compute one distance matrix for each group of features
+        if(len(metrics)==0): # if metrics is not provided, use 'hamming' for all groups
+            metrics = self.group_features.copy()
+            for grp in metrics.keys():
+                metrics[grp] = 'hamming'
         X = self.X_train.append(self.X_test)
         self.distances = {}
         for grp in self.group_features.keys():
             X_curr = X[self.group_features[grp]]
+            # Select uniqe rows
+            if hasattr(self, 'map'):
+                if(len(self.map)>0):
+                    X_curr = X_curr[~X_curr.duplicated()]
+            # Make a list of integers that maps from the row indices in X to the position of the condensed data
             if X_curr.shape[1]==1 and type(X_curr.iloc[0,0]) is str:# if there is only one string feature in a group
                 X_curr.columns = ['col1']
                 # split string and then compute hamming distance on characters
                 X_curr = pd.DataFrame(X_curr.col1.apply(splt_str))
                 X_curr = pd.DataFrame(X_curr.col1.tolist(), index=X_curr.index)
                 X_curr = X_curr=='1' # convert to boolean for better performance
-                dist_vec = np.float32(pdist(X_curr, metric = "hamming"))
+            if metrics[grp]=='tanimoto':
+                dist_vec = 1 - np.float32(pdist(X_curr, metric = compute_tanimoto))
             else:
-                # compute hamming distance on combination of features
-                dist_vec = np.float32(pdist(X_curr, metric = "hamming"))
+                # compute the distance on combination of features
+                dist_vec = np.float32(pdist(X_curr, metric = metrics[grp]))
             # save computed distance matrix in class object (because it takes so long)
             self.distances[grp] = dist_vec
-    
-    def weight_distances(self, alpha=0):
+            
+    def construct_distance_matrix(self, alpha=0):
         if(hasattr(self, 'distances')):
             if alpha==0:
                 alpha = self.alpha
-            # multiply weighted (alpha) distances of different group_features
-            dist_final = np.zeros(next(iter(self.distances.values())).shape, dtype=np.float32)
+            # multiply condensed weighted (alpha) distances of different group_features
+            dist_weighted = self.distances.copy()
             for grp in self.group_features.keys():
-                dist_final = dist_final + np.float32(alpha[grp] * self.distances[grp])
+                dist_weighted[grp] = np.float32(alpha[grp] * self.distances[grp])
         else:
             raise Exception('cannot weight distances since they don\'t exist')
-        return dist_final
-            
-    def split_distance_matrix(self, dist_mat):
-        # Extract train and test matrices
+
+        # Construct the full train and test distance matrices from the condensed distances of each group feature which are only for the uniq rows
+        n = self.X_train.shape[0] + self.X_test.shape[0]
+        dist_mat = np.zeros((n,n), dtype=np.float16)
+        for grp in self.group_features.keys():
+            tmp = np.float16(squareform(dist_weighted[grp]))
+            if(hasattr(self, 'map')):
+                # If groups were condensed, inflate the distance matrix
+                tmp = tmp[self.map[grp],:]
+                tmp = tmp[:,self.map[grp]]
+            if tmp.shape != (n,n):
+                print(tmp.shape)
+                print(n,n)
+                raise Exception('dimension mismatch')
+            dist_mat += tmp
         self.dist_train = dist_mat[:len(self.X_train),:len(self.X_train)]
         self.dist_test = dist_mat[len(self.X_train):,:len(self.X_train)]
         
@@ -97,13 +136,10 @@ class Knn:
     
     def fun_minim(self, x, file='dummy.txt'):
         n_neighbors = np.int(np.round(np.clip(x[0], 1, None)))
-        x = np.clip(x, 0, None)
-        alpha = {0:x[1], 1:x[2], 2:x[3]}
-        tmp = self.weight_distances(alpha=alpha)
-        self.split_distance_matrix(dist_mat=squareform(tmp))
-        tmp = None
+        alpha = {0:np.exp(x[1]), 1:np.exp(x[2]), 2: 1.0}
+        self.construct_distance_matrix(alpha=alpha)
         acc = self.run(n_neighbors=n_neighbors)
-        df = pd.DataFrame([[n_neighbors, x[1], x[2], x[3], acc]])
+        df = pd.DataFrame([[n_neighbors, np.exp(x[1]), np.exp(x[2]), acc]])
         df.to_csv(file, mode='a', header=False)
         
         return 1-acc

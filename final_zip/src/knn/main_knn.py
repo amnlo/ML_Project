@@ -3,6 +3,7 @@
 
 import pandas as pd
 import numpy as np
+import DataSciPy
 
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
@@ -17,37 +18,16 @@ class Knn:
     def __init__(self, name='dummy'):
         self.name = name
         
-    def setup(self, data, cas=[], smiles=[], encode_these=[], group_features={}, alpha={}, seed=13):
-        self.encode_these = encode_these
+    def setup(self, data, group_features={}, alpha={}):
+        if not type(data) is DataSciPy.Dataset:
+            raise Exception('data must be of type DataSciPy.Dataset')
+        self.data = data
         self.group_features = group_features
         self.alpha = alpha
-        self.seed = seed
-        # Encoding categorical features and split
-        print("Encoding categorical features for the KNN algorithm...\n")
-        data, self.y, self.encoder = self.encode_categories(data)
-        print("Splitting dataset in train and test...\n")
-        self.X_train, self.X_test, self.y_train, self.y_test = split_dataset(data, self.y, self.seed)
-        
-    def encode_categories(self, data):
-        y = data.score.copy().values
-        X = data.copy()
-        X = X.drop(columns=['score'])
-    
-        enc = OrdinalEncoder(dtype=int)
-        if len(self.encode_these)==0:
-            tmp = [type(X.iloc[0,er]) is str for er in range(X.shape[1])] # get types of features
-        else:
-            tmp = self.encode_these
-
-        enc.fit(X.loc[:,tmp])
-        X.loc[:,tmp] = \
-        enc.transform(X.loc[:,tmp])
-        
-        return X, y, enc
     
     def condense_featuregroups(self):
         # When features are grouped, there are duplicates for each group. This function calculates the mapping of the full data set to the condensed data
-        X = self.X_train.append(self.X_test)
+        X = self.data.X_train.append(self.data.X_test)
         self.map = {}
         for grp in self.group_features.keys():
             X_f = X[self.group_features[grp]]
@@ -71,7 +51,7 @@ class Knn:
             metrics = self.group_features.copy()
             for grp in metrics.keys():
                 metrics[grp] = 'hamming'
-        X = self.X_train.append(self.X_test)
+        X = self.data.X_train.append(self.data.X_test)
         self.distances = {}
         if len(metrics)>0:
             self.metrics = metrics
@@ -108,7 +88,7 @@ class Knn:
             raise Exception('cannot weight distances since they don\'t exist')
 
         # Construct the full train and test distance matrices from the condensed distances of each group feature which are only for the uniq rows
-        n = self.X_train.shape[0] + self.X_test.shape[0]
+        n = self.data.X_train.shape[0] + self.data.X_test.shape[0]
         dist_mat = np.zeros((n,n), dtype=np.float16)
         for grp in self.group_features.keys():
             tmp = np.float16(squareform(dist_weighted[grp]))
@@ -121,18 +101,18 @@ class Knn:
                 print(n,n)
                 raise Exception('dimension mismatch')
             dist_mat += tmp
-        self.dist_train = dist_mat[:len(self.X_train),:len(self.X_train)]
-        self.dist_test = dist_mat[len(self.X_train):,:len(self.X_train)]
+        self.dist_train = dist_mat[:len(self.data.X_train),:len(self.data.X_train)]
+        self.dist_test = dist_mat[len(self.data.X_train):,:len(self.data.X_train)]
         
     def run(self, n_neighbors=1, leaf_size=60):
         # Run KNN
         neigh = KNeighborsClassifier(metric = 'precomputed', n_neighbors=n_neighbors, leaf_size=leaf_size)
-        neigh.fit(self.dist_train, self.y_train.ravel())
+        neigh.fit(self.dist_train, self.data.y_train.iloc[:,0].ravel())
     
         # Make predictions
         y_pred_train = neigh.predict(self.dist_train)
         y_pred_test = neigh.predict(self.dist_test)
-        acc = accuracy_score(self.y_test, y_pred_test)
+        acc = accuracy_score(self.data.y_test, y_pred_test)
         
         return acc
     

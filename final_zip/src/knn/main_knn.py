@@ -73,6 +73,8 @@ class Knn:
                 metrics[grp] = 'hamming'
         X = self.X_train.append(self.X_test)
         self.distances = {}
+        if len(metrics)>0:
+            self.metrics = metrics
         for grp in self.group_features.keys():
             X_curr = X[self.group_features[grp]]
             # Select uniqe rows
@@ -139,7 +141,10 @@ class Knn:
         alpha = {0:np.exp(x[1]), 1:np.exp(x[2]), 2: 1.0}
         self.construct_distance_matrix(alpha=alpha)
         acc = self.run(n_neighbors=n_neighbors)
-        df = pd.DataFrame([[n_neighbors, np.exp(x[1]), np.exp(x[2]), acc]])
+        tmp = [n_neighbors, np.exp(x[1]), np.exp(x[2]), acc]
+        if len(self.metrics)>0:
+            tmp.extend(self.metrics.values())
+        df = pd.DataFrame([tmp])
         df.to_csv(file, mode='a', header=False)
         
         return 1-acc

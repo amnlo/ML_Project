@@ -24,12 +24,12 @@ data_mult$k <- as.factor(data_mult$k)
 
 # Prepare plots
 gg1 <- ggplot(data_bin, aes(y=accuracy, color=k, shape=dist_chem)) + 
-    geom_point(aes(x=alpha_animal)) + scale_color_viridis(discrete=TRUE) + scale_x_log10(breaks=1*10^(-5:1), limits=c(1e-5,NA)) + 
+    geom_point(aes(x=alpha_animal)) + geom_hline(yintercept=0.902857, linetype='dashed') + scale_color_viridis(discrete=TRUE) + scale_x_log10(breaks=1*10^(-5:1), limits=c(1e-5,NA)) + 
     labs(x=expression(alpha[animal]), y="Accuracy")
 gg2 <- gg1 + geom_point(aes(x=alpha_experiment)) + labs(x=expression(alpha[experiment]), y="Accuracy")
 
 gg3 <- ggplot(data_mult, aes(y=accuracy, color=k, shape=dist_chem)) + 
-    geom_point(aes(x=alpha_animal)) + scale_color_viridis(discrete=TRUE) + scale_x_log10(breaks=1*10^(-5:1), limits=c(1e-5,NA)) + 
+    geom_point(aes(x=alpha_animal)) + geom_hline(yintercept=0.7401428, linetype='dashed') + scale_color_viridis(discrete=TRUE) + scale_x_log10(breaks=1*10^(-5:1), limits=c(1e-5,NA)) + 
     labs(x=expression(alpha[animal]), y="Accuracy")
 gg4 <- gg3 + geom_point(aes(x=alpha_experiment)) + labs(x=expression(alpha[experiment]), y="Accuracy")
 

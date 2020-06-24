@@ -5,6 +5,11 @@ Created on Wed Jun 17 16:04:19 2020
 @author: Lori
 """
 
+import sys
+genpath = 'D:/Code'
+if genpath not in sys.path:
+    sys.path.append(genpath)
+    
 import DataSciPy
 from src.knn.main_knn import *
 import pandas as pd
@@ -43,11 +48,11 @@ dummy.setup_data(X=final_db_epfl_bin.drop(columns=['test_cas','score']),
                  split_test=0.3,
                  seed=13)
 dummy.encode_categories(variables=encode_these_epfl)
-knnone = Knn()
+kep = Knn()
 kep.setup(dummy, group_features=group_features_epfl, alpha=alpha_epfl_bin)
 kep.compute_distance(metrics=metrics_epfl)
 kep.construct_distance_matrix(alpha=alpha_epfl_bin)
-acc = kep.run(n_neighbors=n_neighbors_epfl, leaf_size=best_leaf_epfl_bin) # should be 0.903
+acc = kep.run(n_neighbors=n_neighbors_epfl, leaf_size=best_leaf_epfl_bin) # should be 0.902857
 
 # Prepare multiclass run
 dummy = DataSciPy.Dataset()
@@ -60,4 +65,4 @@ kep = Knn()
 kep.setup(dummy, group_features=group_features_epfl, alpha=alpha_epfl_mult)
 kep.compute_distance(metrics=metrics_epfl)
 kep.construct_distance_matrix(alpha=alpha_epfl_mult)
-acc = kep.run(n_neighbors=n_neighbors_epfl, leaf_size=best_leaf_epfl_mult) # should be 0.740
+acc = kep.run(n_neighbors=n_neighbors_epfl, leaf_size=best_leaf_epfl_mult) # should be 0.7401428

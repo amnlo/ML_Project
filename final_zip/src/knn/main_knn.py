@@ -9,6 +9,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 from itertools import combinations
+from eli5.sklearn import PermutationImportance
 
 from src.knn.helper_knn import *
 from src.general_helper import split_dataset, build_final_datasets, compute_tanimoto
@@ -104,7 +105,7 @@ class Knn:
         self.dist_train = dist_mat[:len(self.data.X_train),:len(self.data.X_train)]
         self.dist_test = dist_mat[len(self.data.X_train):,:len(self.data.X_train)]
         
-    def run(self, n_neighbors=1, leaf_size=60):
+    def run(self, n_neighbors=1, leaf_size=60, perm_importance=False):
         # Run KNN
         neigh = KNeighborsClassifier(metric = 'precomputed', n_neighbors=n_neighbors, leaf_size=leaf_size)
         neigh.fit(self.dist_train, self.data.y_train.iloc[:,0].ravel())
@@ -114,7 +115,13 @@ class Knn:
         y_pred_test = neigh.predict(self.dist_test)
         acc = accuracy_score(self.data.y_test, y_pred_test)
         
-        return acc
+        # Permutation importance
+        if perm_importance:
+            perm = PermutationImportance(neigh, random_state=1)
+            perm = perm.fit(self.dist_test, self.data.y_test.iloc[:,0])
+            return acc, perm
+        else:
+            return acc
     
     def fun_minim(self, x, file='dummy.txt'):
         n_neighbors = np.int(np.round(np.clip(x[0], 1, None)))

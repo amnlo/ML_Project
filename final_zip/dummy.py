@@ -39,7 +39,7 @@ dummy.setup_data(X=final_db.loc[:,['species','conc1_type','exposure_type','class
                 'family','genus','obs_duration_mean','fingerprint']],
                  y=final_db.loc[:,['score']],
                  split_test=0.3)
-dummy.encode_categories(variables=encode_these)
+dummy.encode_categories(variables='all_x', onehot=True)
 
 pth = 'output/knn/knn_class_instances/binary_cls'
 #with open(pth, 'wb') as knn_file:

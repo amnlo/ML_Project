@@ -41,6 +41,14 @@ best_leaf_epfl_mult = 60
 final_db_epfl_bin  = genH.binary_score(final_db_epfl)
 final_db_epfl_mult = genH.multi_score(final_db_epfl)
 
+# Test one-hot encoding
+dummy = DataSciPy.Dataset()
+dummy.setup_data(X=final_db_epfl_bin.drop(columns=['test_cas','score']),
+                 y=final_db_epfl_bin.loc[:,['score']],
+                 split_test=0.3,
+                 seed=13)
+dummy.encode_categories(variables=encode_these_epfl, onehot=True)
+
 # Prepare binary run
 dummy = DataSciPy.Dataset()
 dummy.setup_data(X=final_db_epfl_bin.drop(columns=['test_cas','score']),

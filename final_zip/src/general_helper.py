@@ -115,18 +115,6 @@ def build_final_datasets(X_train, X_test, y_pred_train, y_pred_test, y_train=[],
     
     return X_final_train, X_final_test
 
-def splt_str(x, len_na=1):
-    '''Split a string into a list of characters
-    Inputs:
-        - x (string): String to be split
-        - len_na (int): if x is NA, a list of NAs of length len_na is returned
-    Outputs:
-        - A list of characters'''
-    if pd.isna(x):
-        return ['NA'] * len_na
-    else:
-        return [cr for cr in x]
-
 def compute_tanimoto(a, b):
     a_and_b = (a & b).sum()
     not_a = ~a

@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import itertools
 
-from src.general_helper import splt_str
+from DataSciPy import splt_str
 
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.neighbors import KNeighborsClassifier

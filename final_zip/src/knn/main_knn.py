@@ -66,7 +66,7 @@ class Knn:
             if X_curr.shape[1]==1 and type(X_curr.iloc[0,0]) is str:# if there is only one string feature in a group
                 X_curr.columns = ['col1']
                 # split string and then compute hamming distance on characters
-                X_curr = pd.DataFrame(X_curr.col1.apply(splt_str))
+                X_curr = pd.DataFrame(X_curr.col1.apply(DataSciPy.splt_str))
                 X_curr = pd.DataFrame(X_curr.col1.tolist(), index=X_curr.index)
                 X_curr = X_curr=='1' # convert to boolean for better performance
             if metrics[grp]=='tanimoto':
@@ -117,7 +117,7 @@ class Knn:
         
         # Permutation importance
         if perm_importance:
-            perm = PermutationImportance(neigh, random_state=1)
+            perm = PermutationImportance(neigh, n_iter=2, random_state=1)
             perm = perm.fit(self.dist_test, self.data.y_test.iloc[:,0])
             return acc, perm
         else:

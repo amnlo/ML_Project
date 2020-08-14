@@ -76,7 +76,6 @@ model0.add(keras.layers.Dense(20, activation='relu', kernel_initializer=initiali
 model0.add(keras.layers.Dropout(rate=0.2))
 model0.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
 model0.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
-model0.save_weights('output/nn/manyfeat/model0/model0_initial_weights.h5') # save the initialized weights for n-fold cross validation
 
 model1 = keras.models.Sequential()
 initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=1, seed=1)
@@ -93,7 +92,6 @@ model1.add(keras.layers.Dense(20, activation='relu', kernel_initializer=initiali
 model1.add(keras.layers.Dropout(rate=0.2))
 model1.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
 model1.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
-model1.save_weights('output/nn/manyfeat/model1/model1_initial_weights.h5') # save the initialized weights for n-fold cross validation
 
 model2 = keras.models.Sequential()
 initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=1, seed=1)
@@ -104,7 +102,6 @@ model2.add(keras.layers.Dense(50, activation='relu', kernel_initializer=initiali
 model2.add(keras.layers.Dropout(rate=0.2))
 model2.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
 model2.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
-model2.save_weights('output/nn/manyfeat/model2/model2_initial_weights.h5') # save the initialized weights for n-fold cross validation
 
 model3 = keras.models.Sequential()
 initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=1, seed=1)
@@ -116,11 +113,11 @@ model3.add(keras.layers.Dropout(rate=0.2))
 model3.add(keras.layers.Dense(200, activation='relu', kernel_initializer=initializer))
 model3.add(keras.layers.Dropout(rate=0.2))
 model3.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
-model3.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
-model3.save_weights('output/nn/manyfeat/model3/model3_initial_weights.h5') # save the initialized weights for n-fold cross validation
+adm = tf.keras.optimizers.Adam(learning_rate=0.00001) # adams with smaller learning rate than default
+model3.compile(optimizer=adm, loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
 
 # Make a list of the models to be fitted
-mdls = [model0, model1, model2, model3]
+mdls = [model3]
 
 clbck = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss", restore_best_weights=True, patience=100
@@ -141,18 +138,21 @@ lp = X_trn.LogP.copy() # save the original values as this is scaled for each cv 
 for i in range(len(mdls)):
     os.makedirs('output/nn/manyfeat/model'+str(i), exist_ok=True)
     cv = 0
-    model = mdls[i]
+    model = model3#mdls[i]
+    i = 3
     for trn_ind, vld_ind in kfold.split(X_trn, y_trn):
         # scale the LogP feature; it is the only one that is far from 0/1.
         mn = np.mean(lp.iloc[trn_ind])
         sd = np.std(lp.iloc[trn_ind])
         X_trn.LogP = (lp - mn) / sd
         for ini in range(rand_init):
+            casepath = 'output/nn/manyfeat/model'+str(i)+'/cv'+str(cv)+'ini'+str(ini)
             model = DataSciPy.shuffle_weights(model)
             hist = model.fit(np.array(X_trn.iloc[trn_ind,:]),
                       np.array(y_trn.iloc[trn_ind,0]),
                       validation_data=(np.array(X_trn.iloc[vld_ind,:]), np.array(y_trn.iloc[vld_ind,0])),
                       batch_size=32, epochs=1000, verbose=0, class_weight=class_weight, callbacks=[clbck])
-            model.save_weights('output/nn/manyfeat/model'+str(i)+'/cv'+str(cv)+'ini'+str(ini)+'.h5')
-            DataSciPy.plot_history(hist, file='output/nn/manyfeat/model'+str(i)+'/cv'+str(cv)+'ini'+str(ini)+'_training_hist.pdf')
+            pd.DataFrame.from_dict(hist.history).to_csv(casepath + '_training_hist.txt',index=False)
+            model.save_weights(casepath+'.h5')
+            DataSciPy.plot_history(hist, file=casepath+'_training_hist.pdf')
         cv = cv + 1

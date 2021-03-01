@@ -113,7 +113,7 @@ model3.add(keras.layers.Dropout(rate=0.2))
 model3.add(keras.layers.Dense(200, activation='relu', kernel_initializer=initializer))
 model3.add(keras.layers.Dropout(rate=0.2))
 model3.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
-adm = tf.keras.optimizers.Adam(learning_rate=0.00001) # adams with smaller learning rate than default
+adm = tf.keras.optimizers.Adam(learning_rate=0.0001) # adams with smaller learning rate than default
 model3.compile(optimizer=adm, loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
 
 # Make a list of the models to be fitted
@@ -151,7 +151,7 @@ for i in range(len(mdls)):
             hist = model.fit(np.array(X_trn.iloc[trn_ind,:]),
                       np.array(y_trn.iloc[trn_ind,0]),
                       validation_data=(np.array(X_trn.iloc[vld_ind,:]), np.array(y_trn.iloc[vld_ind,0])),
-                      batch_size=32, epochs=1000, verbose=0, class_weight=class_weight, callbacks=[clbck])
+                      batch_size=32, epochs=2000, verbose=0, class_weight=class_weight, callbacks=[clbck])
             pd.DataFrame.from_dict(hist.history).to_csv(casepath + '_training_hist.txt',index=False)
             model.save_weights(casepath+'.h5')
             DataSciPy.plot_history(hist, file=casepath+'_training_hist.pdf')

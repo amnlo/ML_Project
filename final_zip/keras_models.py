@@ -15,6 +15,7 @@ import DataSciPy
 from sklearn.linear_model import Perceptron
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import validation_curve
+from paper_codes_datasets.helper_knn import load_data_knn
 from scipy.sparse import vstack
 import pickle
 import pandas as pd
@@ -41,6 +42,28 @@ dummy.setup_data(X=final_db_manyfeat.drop(columns=['score']),
 encode_these = ['ring_number','doubleBond','tripleBond','alone_atom_number','species',
                 'conc1_type','exposure_type','obs_duration_mean','family','genus','tax_order','class']
 dummy.encode_categories(variables=encode_these, onehot=True)
+
+#%%
+## =============================================================================
+## Prepare data the same way as Simone
+final_db = pd.read_csv('../paper_codes_datasets/lc_db_processed.csv')
+fp = pd.DataFrame(final_db.fingerprint.apply(DataSciPy.splt_str))
+fp = pd.DataFrame(fp.fingerprint.tolist(), index=fp.index)
+final_db_manyfeat = final_db.drop(columns=['fingerprint']).join(fp).drop(columns=['test_cas'])
+final_db = final_db.drop(columns=['fingerprint','Mol','atom_number','alone_atom_number','bonds_number']).join(fp).drop(columns=['test_cas'])
+# Prepare binary classification problem and encode features
+final_db = genH.binary_score(final_db)
+final_db_manyfeat = genH.binary_score(final_db_manyfeat)
+
+dummy = DataSciPy.Dataset()
+dummy.setup_data(X=final_db_manyfeat.drop(columns=['score']),
+                 y=final_db_manyfeat.loc[:,['score']],
+                 split_test=0.3)
+encode_these = ['ring_number','doubleBond','tripleBond','alone_atom_number','species',
+                'conc1_type','exposure_type','obs_duration_mean','family','genus','tax_order','class']
+dummy.encode_categories(variables=encode_these, onehot=True)
+
+
 #%%
 ## =============================================================================
 ## Perceptrons

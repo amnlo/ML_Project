@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 
 from time import ctime
 from math import sqrt
-from general_helper import multiclass_encoding
 
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler 
 from sklearn.model_selection import train_test_split, KFold
@@ -21,11 +20,8 @@ from sklearn.metrics import recall_score, roc_auc_score, precision_score, accura
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import sem
 
-from rdkit.DataStructs.cDataStructs import CreateFromBitString
-from rdkit.DataManip.Metric.rdMetricMatrixCalc import GetTanimotoDistMat
 
-
-def load_data_knn(DATA_PATH, encoding, seed = 42):
+def load_data_knn(DATA_PATH, seed = 42):
     
     db = pd.read_csv(DATA_PATH).drop(columns = ['Unnamed: 0', 'test_cas','smiles'])
     
@@ -58,13 +54,8 @@ def load_data_knn(DATA_PATH, encoding, seed = 42):
     
     db.drop(columns = ['fish'], inplace = True)
     
-    # Encoding for target variable: binary and multiclass
-    if encoding == 'binary':
-        db['conc1_mean'] = np.where(db['conc1_mean'].values > 1, 1, 0)
-
-    elif encoding == 'multiclass':
-        t = db['conc1_mean'].copy()
-        db['conc1_mean'] = multiclass_encoding(t)
+    # Encoding for target variable: binary
+    db['conc1_mean'] = np.where(db['conc1_mean'].values > 1, 1, 0)
     
     X = db.drop(columns = 'conc1_mean')
     y = db['conc1_mean'].values

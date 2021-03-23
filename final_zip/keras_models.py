@@ -16,7 +16,7 @@ from importlib import reload
 from sklearn.linear_model import Perceptron
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import validation_curve
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler,StandardScaler
 import paper_codes_datasets.helper_knn as hlp
 from scipy.sparse import vstack
 import pickle
@@ -26,24 +26,9 @@ import copy
 import matplotlib.pyplot as plt
 import src.general_helper as genH
 #%%
-## =============================================================================
-## Prepare data
-final_db = pd.read_csv('data/processed/final_db_update.csv')
-fp = pd.DataFrame(final_db.fingerprint.apply(DataSciPy.splt_str))
-fp = pd.DataFrame(fp.fingerprint.tolist(), index=fp.index)
-final_db_manyfeat = final_db.drop(columns=['fingerprint']).join(fp).drop(columns=['test_cas'])
-final_db = final_db.drop(columns=['fingerprint','Mol','atom_number','alone_atom_number','bonds_number']).join(fp).drop(columns=['test_cas'])
-# Prepare binary classification problem and encode features
-final_db = genH.binary_score(final_db)
-final_db_manyfeat = genH.binary_score(final_db_manyfeat)
+# Control parameters
 
-dummy = DataSciPy.Dataset()
-dummy.setup_data(X=final_db_manyfeat.drop(columns=['score']),
-                 y=final_db_manyfeat.loc[:,['score']],
-                 split_test=0.3)
-encode_these = ['ring_number','doubleBond','tripleBond','alone_atom_number','species',
-                'conc1_type','exposure_type','obs_duration_mean','family','genus','tax_order','class']
-dummy.encode_categories(variables=encode_these, onehot=True)
+finmod_alldat = False
 
 #%%
 ## =============================================================================
@@ -51,6 +36,7 @@ dummy.encode_categories(variables=encode_these, onehot=True)
 final_db = pd.read_csv('paper_codes_datasets/lc_db_processed.csv')
 fp = pd.DataFrame(final_db.pubchem2d.apply(DataSciPy.splt_str))
 fp = pd.DataFrame(fp.pubchem2d.tolist(), index=fp.index)
+#fp = fp.astype(int)
 final_db_manyfeat = final_db.drop(columns=['pubchem2d']).join(fp)
 final_db_manyfeat = final_db_manyfeat.drop(columns=['test_cas','smiles',
                                                     'fish','Unnamed: 0'])
@@ -152,30 +138,152 @@ model3.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initia
 adm = tf.keras.optimizers.Adam(learning_rate=0.0001) # adams with smaller learning rate than default
 model3.compile(optimizer=adm, loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
 
+#model4 is similar to model2, but has tanh activation
+model4 = keras.models.Sequential()
+initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=1, seed=1)
+model4.add(keras.Input(shape=(dummy.X_train.shape[1],)))
+model4.add(keras.layers.Dense(1800, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model4.add(keras.layers.Dropout(rate=0.3))
+model4.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
+model4.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
+
+model5 = keras.models.Sequential()
+initializer = tf.keras.initializers.he_normal(seed=1)
+model5.add(keras.Input(shape=(dummy.X_train.shape[1],)))
+model5.add(keras.layers.Dense(200, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(50, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(50, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(20, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(20, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(20, activation='relu', kernel_initializer=initializer))
+model5.add(keras.layers.Dropout(rate=0.3))
+model5.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
+model5.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
+
+model6 = keras.models.Sequential()
+initializer = tf.keras.initializers.glorot_normal(seed=1)
+model6.add(keras.Input(shape=(dummy.X_train.shape[1],)))
+model6.add(keras.layers.Dense(200, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(50, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(50, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model6.add(keras.layers.Dropout(rate=0.5))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model6.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
+model6.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
+
+model7 = keras.models.Sequential()
+initializer = tf.keras.initializers.glorot_normal(seed=1)
+model7.add(keras.Input(shape=(dummy.X_train.shape[1],)))
+model7.add(keras.layers.Dense(200, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(50, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(50, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+#model7.add(keras.layers.Dropout(rate=0.5))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dense(10, activation='tanh', kernel_initializer=initializer))
+model7.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
+model7.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
+
+#model8 is similar to model4
+model8 = keras.models.Sequential()
+initializer = tf.keras.initializers.glorot_normal(seed=1)
+model8.add(keras.Input(shape=(dummy.X_train.shape[1],)))
+model8.add(keras.layers.Dense(1600, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(20, activation='tanh', kernel_initializer=initializer))
+model8.add(keras.layers.Dropout(rate=0.3))
+model8.add(keras.layers.Dense(1, activation='sigmoid', kernel_initializer=initializer))
+model8.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) # 'cross-entropy' is the same as the 'log-loss' of scikitlearn
+
+
+
 # Make a dict of the models to be fitted
-mdls = {'model0':model0,
-        'model1':model1,
-        'model2':model2,
-        'model3':model3}
+mdls = {#'model0':model0,
+        #'model1':model1,
+        #'model2':model2,
+        #'model3':model3
+        'model7':model7,
+        'model8':model8}
 
 clbck = tf.keras.callbacks.EarlyStopping(
-    monitor="val_loss", restore_best_weights=True, patience=100
+    monitor="val_loss", restore_best_weights=True, patience=200
 )
 
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 # w = dummy.y_train.iloc[:,0].value_counts()
 # class_weight = {0: len(dummy.y_train)/w[0]/2, 1: len(dummy.y_train)/w[1]/2}
-rand_init = 3 # number of random weight inizializations
+rand_init = 2 # number of random weight inizializations
 #%%
 # Tensorflow does not accept boolean (or int) data, so convert to float
 X_trn = dummy.X_train.astype(np.float32)
 X_tst = dummy.X_test.astype(np.float32)
 y_trn = dummy.y_train.astype(np.float32)
 y_tst = dummy.y_test.astype(np.float32)
+if finmod_alldat:
+    # Combine train and test for final model
+    X_trn = X_trn.append(X_tst)
+    y_trn = y_trn.append(y_tst)
 # Fit all models
-# lp = X_trn.LogP.copy() # save the original values as this is scaled for each cv run
 for key in mdls:
-    os.makedirs('output/nn/simonedata/'+key, exist_ok=True)
+    if finmod_alldat:
+        pth_ext = 'finmod_alldat/'
+    else:
+        pth_ext = ''
+    fldr = 'output/nn/simonedata/'+pth_ext+key
+    os.makedirs(fldr, exist_ok=True)
     cv = 0
     model = mdls[key]
     for trn_ind, vld_ind in kfold.split(X_trn, y_trn):
@@ -184,7 +292,8 @@ for key in mdls:
         # sd = np.std(lp.iloc[trn_ind])
         # X_trn.LogP = (lp - mn) / sd
         for ini in range(rand_init):
-            casepath = 'output/nn/simonedata/'+key+'/cv'+str(cv)+'ini'+str(ini)
+            casepath = fldr+'/cv'+str(cv)+'ini'+str(ini)
+            #model.load_weights(casepath+'.h5')
             model = DataSciPy.shuffle_weights(model)
             hist = model.fit(np.array(X_trn.iloc[trn_ind,:]),
                       np.array(y_trn.iloc[trn_ind,0]),

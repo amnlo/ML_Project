@@ -15,7 +15,7 @@ def binary_score(final_db):
             
     # Computing score
     final_db_scored = final_db.copy()
-    final_db_scored["score"] = np.where(final_db_scored.conc1_mean > 1, 1, 0)
+    final_db_scored["score"] = np.where(final_db_scored.conc1_mean > 1, 0, 1)
     # Drop conc1_mean (it is replaced by score)
     final_db_scored = final_db_scored.drop(columns=['conc1_mean'])
     
